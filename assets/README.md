@@ -1,12 +1,29 @@
 # Assets
 
-Place your application icons here:
+Application icons for the ZH-CN to ZH-TW Converter.
 
-- **icon.png** - 512x512 PNG for Linux AppImage
-- **icon.ico** - Windows ICO file (multiple resolutions: 16x16, 32x32, 48x48, 256x256)
+## Files
 
-You can create icons using online tools like:
-- https://www.icoconverter.com/ (PNG to ICO)
-- https://favicon.io/ (Icon generator)
+- **icon.png** - 512x512 PNG for Linux AppImage (61 KB)
+- **icon.ico** - Windows ICO file with multiple resolutions: 16x16, 32x32, 48x48, 256x256 (31 KB)
 
-For now, the build will work without icons, but it's recommended to add them for a professional appearance.
+## Icon Design
+
+The icon features:
+- Blue-to-purple gradient background with subtle Minecraft-style isometric cube patterns
+- Central white rounded rectangle containing:
+  - "简" (simplified Chinese) in black
+  - Blue arrow indicating conversion direction
+  - "繁" (traditional Chinese) in purple
+  - "ZH-CN → ZH-TW" subtitle
+  - "Resource Pack Converter" description
+
+## Regenerating Icons
+
+If you need to regenerate the icons with design changes:
+
+```bash
+node generate-icon.js
+```
+
+This requires the `canvas` package (already installed as a dev dependency).
