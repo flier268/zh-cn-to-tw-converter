@@ -37,10 +37,14 @@ jobs:
       - name: Build Windows
         if: matrix.os == 'windows-latest'
         run: npm run build:win
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Linux AppImage
         if: matrix.os == 'ubuntu-latest'
         run: npm run build:linux
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Windows artifacts
         if: matrix.os == 'windows-latest'
