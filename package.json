@@ -33,6 +33,7 @@
   "build": {
     "appId": "com.minecraft.zh-cn-to-tw-converter",
     "productName": "ZH-CN to ZH-TW Converter",
+    "publish": null,
     "directories": {
       "output": "dist"
     },
