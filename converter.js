@@ -44,6 +44,12 @@ function shouldConvertFile(filePath) {
     return true;
   }
 
+  // OpenLoader support: convert all .json/.lang files in openloader directories
+  // OpenLoader loads resources from config/openloader/resources/ or openloader/resources/
+  if (lowerPath.includes("openloader/")) {
+    return true;
+  }
+
   // For .json and .lang files, check if it contains zh_cn or zh-cn in the path
   return lowerPath.includes("zh_cn") || lowerPath.includes("zh-cn");
 }

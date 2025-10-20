@@ -10,6 +10,7 @@ A cross-platform GUI application to convert Minecraft resource packs from Simpli
 - **Easy-to-use GUI**: Simple drag-and-drop interface
 - **Automatic conversion**: Converts all zh_cn/zh-cn language files to zh_tw/zh-tw
 - **SNBT support**: Automatically converts all .snbt files (FTB Quests, etc.)
+- **OpenLoader support**: Converts all language files in OpenLoader directories
 - **Progress tracking**: Real-time progress bar and status updates
 - **Cross-platform**: Available for Windows (.exe) and Linux (AppImage)
 - **Smart processing**: Preserves original files while adding converted versions
@@ -56,6 +57,10 @@ The converter:
      - Files matching `**/zh_CN/**/*.{json,lang}` → `**/zh_TW/**/*.{json,lang}`
      - Files matching `**/zh-CN/**/*.{json,lang}` → `**/zh-TW/**/*.{json,lang}`
      - (All case variations are supported)
+   - **OpenLoader files** (all language files in openloader directories):
+     - All `.json` and `.lang` files in `**/openloader/**` paths
+     - Supports both `config/openloader/resources/` (1.17+) and `openloader/resources/` (legacy)
+     - Converts all language files regardless of naming convention
    - **SNBT files** (always converted, no language flag required):
      - All files ending with `.snbt` extension
      - Commonly used in FTB Quests and other mods for quest data
