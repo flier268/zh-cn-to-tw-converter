@@ -1,0 +1,104 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows
+        if: matrix.os == 'windows-latest'
+        run: npm run build:win
+
+      - name: Build Linux AppImage
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run build:linux
+
+      - name: Upload Windows artifacts
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: dist/*.exe
+
+      - name: Upload Linux artifacts
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: dist/*.AppImage
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: ./artifacts/windows
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-build
+          path: ./artifacts/linux
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/windows/*.exe
+            artifacts/linux/*.AppImage
+          body: |
+            ## ZH-CN to ZH-TW Converter
+
+            簡體中文 → 繁體中文 資源包轉換工具
+
+            ### 下載
+
+            - **Windows**: 下載 `.exe` 檔案
+            - **Linux**: 下載 `.AppImage` 檔案
+
+            ### 使用方法
+
+            1. 開啟應用程式
+            2. 選擇要轉換的 ZIP 資源包
+            3. 選擇儲存位置
+            4. 點擊「開始轉換」
+
+            ### 更新內容
+
+            請參閱 commit 歷史記錄
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

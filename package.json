@@ -1,0 +1,76 @@
+{
+  "name": "zh-cn-to-tw-converter",
+  "version": "1.0.0",
+  "description": "GUI application to convert Minecraft resource packs from Simplified Chinese to Traditional Chinese",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux AppImage",
+    "build:all": "electron-builder --win --linux AppImage"
+  },
+  "keywords": [
+    "minecraft",
+    "chinese",
+    "converter",
+    "zh-cn",
+    "zh-tw"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cjk-conv": "^1.2.150",
+    "novel-segment": "^2.7.121",
+    "adm-zip": "^0.5.16"
+  },
+  "devDependencies": {
+    "electron": "^38.3.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.minecraft.zh-cn-to-tw-converter",
+    "productName": "ZH-CN to ZH-TW Converter",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "converter.js",
+      "index.html",
+      "styles.css",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>簡體中文 → 繁體中文 轉換器</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Minecraft 資源包轉換器</h1>
+      <p class="subtitle">簡體中文 (zh-CN) → 繁體中文 (zh-TW)</p>
+    </header>
+
+    <main>
+      <div class="section">
+        <h2>選擇檔案</h2>
+        <div class="file-input-group">
+          <button id="selectInputBtn" class="btn btn-primary">選擇 ZIP 檔案</button>
+          <div id="inputFilePath" class="file-path">尚未選擇檔案</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>儲存位置</h2>
+        <div class="file-input-group">
+          <button id="selectOutputBtn" class="btn btn-secondary" disabled>選擇儲存位置</button>
+          <div id="outputFilePath" class="file-path">尚未選擇位置</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <button id="convertBtn" class="btn btn-success btn-large" disabled>開始轉換</button>
+      </div>
+
+      <div id="progressSection" class="section hidden">
+        <h2>轉換進度</h2>
+        <div class="progress-bar-container">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div id="progressMessage" class="progress-message">準備中...</div>
+      </div>
+
+      <div id="resultSection" class="section hidden">
+        <h2>轉換結果</h2>
+        <div id="resultContent" class="result-content"></div>
+      </div>
+    </main>
+
+    <footer>
+      <p>此工具會自動將資源包中的簡體中文檔案轉換為繁體中文</p>
+      <p class="version">v1.0.0</p>
+    </footer>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
