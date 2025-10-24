@@ -37,10 +37,10 @@ app.on("window-all-closed", function () {
   if (process.platform !== "darwin") app.quit();
 });
 
-// Handle file or folder selection
-ipcMain.handle("select-input-file", async () => {
+// Handle ZIP file selection
+ipcMain.handle("select-zip-file", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ["openFile", "openDirectory"],
+    properties: ["openFile"],
     filters: [
       { name: "ZIP Files", extensions: ["zip"] },
       { name: "All Files", extensions: ["*"] },
@@ -48,11 +48,25 @@ ipcMain.handle("select-input-file", async () => {
   });
 
   if (!result.canceled && result.filePaths.length > 0) {
-    const selectedPath = result.filePaths[0];
-    const stats = fs.statSync(selectedPath);
     return {
-      path: selectedPath,
-      isFolder: stats.isDirectory(),
+      path: result.filePaths[0],
+      isFolder: false,
+    };
+  }
+  return null;
+});
+
+// Handle folder selection
+ipcMain.handle("select-input-folder", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openDirectory"],
+    title: "選擇資料夾",
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    return {
+      path: result.filePaths[0],
+      isFolder: true,
     };
   }
   return null;

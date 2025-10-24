@@ -2,7 +2,8 @@ let inputFilePath = null;
 let outputFilePath = null;
 let isFolder = false;
 
-const selectInputBtn = document.getElementById("selectInputBtn");
+const selectZipBtn = document.getElementById("selectZipBtn");
+const selectFolderBtn = document.getElementById("selectFolderBtn");
 const selectOutputBtn = document.getElementById("selectOutputBtn");
 const convertBtn = document.getElementById("convertBtn");
 const inputFilePathDisplay = document.getElementById("inputFilePath");
@@ -15,31 +16,40 @@ const resultContent = document.getElementById("resultContent");
 const convertEnUsCheckbox = document.getElementById("convertEnUsCheckbox");
 const convertNestedZipCheckbox = document.getElementById("convertNestedZipCheckbox");
 
-// Select input file
-selectInputBtn.addEventListener("click", async () => {
-  const result = await window.api.selectInputFile();
+// Select ZIP file
+selectZipBtn.addEventListener("click", async () => {
+  const result = await window.api.selectZipFile();
   if (result) {
     inputFilePath = result.path;
-    isFolder = result.isFolder;
+    isFolder = false;
     inputFilePathDisplay.textContent = result.path;
     selectOutputBtn.disabled = false;
 
-    // Auto-generate output filename/path
-    if (isFolder) {
-      // For folders, suggest a new folder name
-      const folderName = result.path.split(/[\\/]/).pop();
-      const suggestedName = `${folderName}-zh_tw`;
-      const outputPath = result.path.replace(/[^/\\]+$/, suggestedName);
-      outputFilePath = outputPath;
-      outputFilePathDisplay.textContent = outputPath;
-    } else {
-      // For ZIP files, suggest a new ZIP name
-      const fileName = result.path.split(/[\\/]/).pop().replace(".zip", "");
-      const suggestedName = `${fileName}-zh_tw.zip`;
-      const outputPath = result.path.replace(/[^/\\]+$/, suggestedName);
-      outputFilePath = outputPath;
-      outputFilePathDisplay.textContent = outputPath;
-    }
+    // Auto-generate output ZIP name
+    const fileName = result.path.split(/[\\/]/).pop().replace(".zip", "");
+    const suggestedName = `${fileName}-zh_tw.zip`;
+    const outputPath = result.path.replace(/[^/\\]+$/, suggestedName);
+    outputFilePath = outputPath;
+    outputFilePathDisplay.textContent = outputPath;
+    convertBtn.disabled = false;
+  }
+});
+
+// Select folder
+selectFolderBtn.addEventListener("click", async () => {
+  const result = await window.api.selectInputFolder();
+  if (result) {
+    inputFilePath = result.path;
+    isFolder = true;
+    inputFilePathDisplay.textContent = result.path;
+    selectOutputBtn.disabled = false;
+
+    // Auto-generate output folder name
+    const folderName = result.path.split(/[\\/]/).pop();
+    const suggestedName = `${folderName}-zh_tw`;
+    const outputPath = result.path.replace(/[^/\\]+$/, suggestedName);
+    outputFilePath = outputPath;
+    outputFilePathDisplay.textContent = outputPath;
     convertBtn.disabled = false;
   }
 });
@@ -76,7 +86,8 @@ convertBtn.addEventListener("click", async () => {
   if (!inputFilePath || !outputFilePath) return;
 
   // Disable buttons during conversion
-  selectInputBtn.disabled = true;
+  selectZipBtn.disabled = true;
+  selectFolderBtn.disabled = true;
   selectOutputBtn.disabled = true;
   convertBtn.disabled = true;
   convertEnUsCheckbox.disabled = true;
@@ -104,7 +115,8 @@ convertBtn.addEventListener("click", async () => {
     showError(error.message);
   } finally {
     // Re-enable buttons
-    selectInputBtn.disabled = false;
+    selectZipBtn.disabled = false;
+    selectFolderBtn.disabled = false;
     selectOutputBtn.disabled = false;
     convertBtn.disabled = false;
     convertEnUsCheckbox.disabled = false;
