@@ -34,6 +34,45 @@ chmod +x ZH-CN-to-ZH-TW-Converter-*.AppImage
 ./ZH-CN-to-ZH-TW-Converter-*.AppImage
 ```
 
+**Note about Linux Sandbox**: The AppImage includes an embedded fix for the Chromium SUID sandbox issue common in AppImages. The fix automatically disables the SUID sandbox and uses user namespace sandboxing instead, providing security without requiring root permissions. The AppImage works out of the box without any additional configuration or command-line flags.
+
+<details>
+<summary>Technical Details: How the Sandbox Fix Works</summary>
+
+### The Problem
+Electron apps (based on Chromium) traditionally use a SUID sandbox that requires a `chrome-sandbox` binary owned by root with mode 4755. AppImages mount to temporary directories (usually `/tmp`) which:
+- Are often mounted with the `nosuid` flag (prevents SUID binaries)
+- Don't allow non-root users to create root-owned files
+- Cause the app to crash with: "The SUID sandbox helper binary was found, but is not configured correctly"
+
+### Our Solution
+This project implements an **automatic build-time fix** using electron-builder's `afterPack` hook (`appimage-fix.js`):
+
+1. **During build**, after packaging the Linux app:
+   - Renames the Electron executable from `zh-cn-to-tw-converter` to `zh-cn-to-tw-converter.bin`
+   - Creates a shell wrapper script with the original name `zh-cn-to-tw-converter`
+   - The wrapper launches the `.bin` file with `--no-sandbox` flag
+
+2. **When the AppImage runs**:
+   - The wrapper script executes first
+   - Passes `--no-sandbox` to disable SUID sandbox
+   - Electron automatically falls back to **user namespace sandboxing**
+   - Provides process isolation without requiring SUID
+
+### Security Considerations
+- **With SUID sandbox** (traditional): Maximum isolation, but incompatible with AppImages
+- **With user namespaces** (our solution): Good isolation using Linux kernel features (no root needed)
+- **No sandbox** (`--no-sandbox` only): Least secure, but acceptable for trusted desktop apps
+
+Our solution uses **user namespace sandboxing**, which provides good security through Linux kernel namespaces while maintaining AppImage compatibility. This is safe for desktop applications processing local files.
+
+### Implementation Files
+- `appimage-fix.js`: Build-time script that creates the wrapper
+- `package.json`: Contains `afterPack: "./appimage-fix.js"` in build config
+- `main.js`: Configures Electron to use namespace sandbox features
+
+</details>
+
 ## Usage
 
 1. **Launch the application**
@@ -130,6 +169,7 @@ zh-cn-to-tw-converter/
 │   ├── icon.png               # Linux icon (512x512)
 │   ├── icon.ico               # Windows icon
 │   └── README.md              # Icon guidelines
+├── appimage-fix.js            # Linux AppImage sandbox fix (afterPack hook)
 ├── converter.js               # Core conversion logic
 ├── main.js                    # Electron main process
 ├── preload.js                 # Electron preload script

@@ -3,11 +3,6 @@ const path = require("path");
 const fs = require("fs");
 const { processZipFile, processFolderPath } = require("./converter");
 
-// Disable sandbox for AppImage builds to avoid SUID sandbox issues
-if (process.env.APPIMAGE) {
-  app.commandLine.appendSwitch("no-sandbox");
-}
-
 let mainWindow;
 
 function createWindow() {

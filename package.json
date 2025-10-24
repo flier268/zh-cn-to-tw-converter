@@ -4,7 +4,7 @@
   "description": "GUI application to convert Minecraft resource packs from Simplified Chinese to Traditional Chinese",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron . --no-sandbox",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux AppImage",
@@ -33,6 +33,7 @@
   "build": {
     "appId": "com.minecraft.zh-cn-to-tw-converter",
     "productName": "ZH-CN to ZH-TW Converter",
+    "afterPack": "./appimage-fix.js",
     "publish": null,
     "directories": {
       "output": "dist"
