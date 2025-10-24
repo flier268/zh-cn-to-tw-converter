@@ -110,14 +110,28 @@ function convertFilePath(filePath) {
 }
 
 /**
+ * Check if a buffer contains a ZIP file by checking its magic bytes
+ * @param {Buffer} buffer - Buffer to check
+ * @returns {boolean} - True if buffer appears to be a ZIP file
+ */
+function isZipFile(buffer) {
+  // ZIP files start with "PK" (0x50 0x4B) magic bytes
+  if (buffer.length < 4) return false;
+  return buffer[0] === 0x50 && buffer[1] === 0x4B;
+}
+
+/**
  * Process a zip file: extract, convert zh_cn to zh_tw, and repack
  * @param {string} inputPath - Path to input zip file
  * @param {string} outputPath - Path to output zip file
  * @param {boolean} convertEnUs - Whether to also convert en-us files
  * @param {function} progressCallback - Callback function for progress updates
+ * @param {number} depth - Current nesting depth (for nested ZIP handling)
+ * @param {boolean} convertNestedZip - Whether to convert nested ZIP files
  * @returns {Promise<Object>} - Result object with stats
  */
-async function processZipFile(inputPath, outputPath, convertEnUs = false, progressCallback = null) {
+async function processZipFile(inputPath, outputPath, convertEnUs = false, progressCallback = null, depth = 0, convertNestedZip = true) {
+  const MAX_DEPTH = 10; // Maximum nesting depth to prevent infinite recursion
   const startTime = Date.now();
   const stats = {
     totalFiles: 0,
@@ -167,39 +181,82 @@ async function processZipFile(inputPath, outputPath, convertEnUs = false, progre
         // Note: We don't pass the attr parameter because adm-zip doesn't handle it correctly
         // It will automatically set proper file permissions (0o100644 = rw-r--r--)
 
-        // Determine if we should convert this file based on the new logic
+        const fileData = entry.getData();
         const lowerPath = entry.entryName.toLowerCase();
-        const isEnUsFile = (lowerPath.endsWith(".json") || lowerPath.endsWith(".lang")) &&
-                           (lowerPath.includes("en_us") || lowerPath.includes("en-us"));
 
-        // Check if this file should be converted
-        if (shouldConvertFile(entry.entryName, false)) {
-          // This is a zh_cn file or snbt/openloader file - always convert
-          const content = entry.getData().toString("utf8");
-          const converted = convert(content);
-          const newPath = convertFilePath(entry.entryName);
+        // Check if this is a nested ZIP file and if nested ZIP conversion is enabled
+        if (convertNestedZip && lowerPath.endsWith('.zip') && isZipFile(fileData) && depth < MAX_DEPTH) {
+          // Process nested ZIP file
+          if (progressCallback) {
+            progressCallback({
+              stage: "processing",
+              message: `正在處理嵌套 ZIP: ${entry.entryName}...`,
+              total: stats.totalFiles,
+              current: i + 1
+            });
+          }
 
-          // Add both original and converted versions (adm-zip will set proper permissions)
-          outputZip.addFile(entry.entryName, entry.getData());
-          outputZip.addFile(newPath, Buffer.from(converted, "utf8"));
+          // Create temporary files for nested ZIP processing
+          const tempInputPath = path.join(os.tmpdir(), `nested-input-${Date.now()}-${Math.random().toString(36).substring(7)}.zip`);
+          const tempOutputPath = path.join(os.tmpdir(), `nested-output-${Date.now()}-${Math.random().toString(36).substring(7)}.zip`);
 
-          stats.convertedFiles++;
-        } else if (convertEnUs && isEnUsFile && !hasZhCnFiles) {
-          // Only convert en-us files if:
-          // 1. convertEnUs is enabled
-          // 2. This is an en-us file
-          // 3. There are NO zh_cn files in the zip
-          const content = entry.getData().toString("utf8");
-          const converted = convert(content);
+          try {
+            // Write nested ZIP to temporary file
+            await fs.writeFile(tempInputPath, fileData);
 
-          // Replace the en-us file with converted content (keep original path)
-          outputZip.addFile(entry.entryName, Buffer.from(converted, "utf8"));
+            // Recursively process nested ZIP
+            await processZipFile(tempInputPath, tempOutputPath, convertEnUs, null, depth + 1, convertNestedZip);
 
-          stats.convertedFiles++;
+            // Read processed nested ZIP
+            const processedZipData = await fs.readFile(tempOutputPath);
+
+            // Replace the nested ZIP with the processed version
+            outputZip.addFile(entry.entryName, processedZipData);
+
+            stats.convertedFiles++;
+          } finally {
+            // Clean up temporary files
+            try {
+              await fs.unlink(tempInputPath).catch(() => {});
+              await fs.unlink(tempOutputPath).catch(() => {});
+            } catch (cleanupError) {
+              // Ignore cleanup errors
+            }
+          }
         } else {
-          // Just copy the file as-is (adm-zip will set proper permissions)
-          outputZip.addFile(entry.entryName, entry.getData());
-          stats.skippedFiles++;
+          // Determine if we should convert this file based on the new logic
+          const isEnUsFile = (lowerPath.endsWith(".json") || lowerPath.endsWith(".lang")) &&
+                             (lowerPath.includes("en_us") || lowerPath.includes("en-us"));
+
+          // Check if this file should be converted
+          if (shouldConvertFile(entry.entryName, false)) {
+            // This is a zh_cn file or snbt/openloader file - always convert
+            const content = fileData.toString("utf8");
+            const converted = convert(content);
+            const newPath = convertFilePath(entry.entryName);
+
+            // Add both original and converted versions (adm-zip will set proper permissions)
+            outputZip.addFile(entry.entryName, fileData);
+            outputZip.addFile(newPath, Buffer.from(converted, "utf8"));
+
+            stats.convertedFiles++;
+          } else if (convertEnUs && isEnUsFile && !hasZhCnFiles) {
+            // Only convert en-us files if:
+            // 1. convertEnUs is enabled
+            // 2. This is an en-us file
+            // 3. There are NO zh_cn files in the zip
+            const content = fileData.toString("utf8");
+            const converted = convert(content);
+
+            // Replace the en-us file with converted content (keep original path)
+            outputZip.addFile(entry.entryName, Buffer.from(converted, "utf8"));
+
+            stats.convertedFiles++;
+          } else {
+            // Just copy the file as-is (adm-zip will set proper permissions)
+            outputZip.addFile(entry.entryName, fileData);
+            stats.skippedFiles++;
+          }
         }
       } catch (error) {
         stats.errors.push({ file: entry.entryName, error: error.message });
@@ -375,6 +432,7 @@ module.exports = {
   convert,
   shouldConvertFile,
   convertFilePath,
+  isZipFile,
   processZipFile,
   processFolderPath
 };

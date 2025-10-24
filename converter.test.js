@@ -1,4 +1,4 @@
-const { convert, shouldConvertFile, convertFilePath, processZipFile, processFolderPath } = require('./converter');
+const { convert, shouldConvertFile, convertFilePath, isZipFile, processZipFile, processFolderPath } = require('./converter');
 const AdmZip = require('adm-zip');
 const fs = require('fs').promises;
 const path = require('path');
@@ -190,6 +190,37 @@ describe('Converter Module', () => {
     });
   });
 
+  describe('isZipFile()', () => {
+    test('should detect valid ZIP files', () => {
+      // Create a simple ZIP file
+      const zip = new AdmZip();
+      zip.addFile('test.txt', Buffer.from('test', 'utf8'));
+      const zipBuffer = zip.toBuffer();
+
+      expect(isZipFile(zipBuffer)).toBe(true);
+    });
+
+    test('should reject non-ZIP files', () => {
+      const textBuffer = Buffer.from('This is not a ZIP file', 'utf8');
+      expect(isZipFile(textBuffer)).toBe(false);
+    });
+
+    test('should reject empty buffers', () => {
+      const emptyBuffer = Buffer.alloc(0);
+      expect(isZipFile(emptyBuffer)).toBe(false);
+    });
+
+    test('should reject buffers that are too short', () => {
+      const shortBuffer = Buffer.from([0x50, 0x4B]); // Only "PK"
+      expect(isZipFile(shortBuffer)).toBe(false);
+    });
+
+    test('should reject buffers with wrong magic bytes', () => {
+      const wrongBuffer = Buffer.from([0x00, 0x00, 0x00, 0x00]);
+      expect(isZipFile(wrongBuffer)).toBe(false);
+    });
+  });
+
   describe('processZipFile()', () => {
     let testDir;
     let inputZipPath;
@@ -325,6 +356,130 @@ describe('Converter Module', () => {
       // Verify all files are skipped
       expect(stats.convertedFiles).toBe(0);
       expect(stats.skippedFiles).toBe(2);
+    });
+
+    test('should process nested ZIP files', async () => {
+      // Create inner ZIP with Chinese language file
+      const innerZip = new AdmZip();
+      innerZip.addFile('assets/mod/lang/zh_cn.json', Buffer.from('{"test": "测试"}', 'utf8'));
+      const innerZipBuffer = innerZip.toBuffer();
+
+      // Create outer ZIP containing the inner ZIP
+      const outerZip = new AdmZip();
+      outerZip.addFile('inner.zip', innerZipBuffer);
+      outerZip.addFile('readme.txt', Buffer.from('This is a readme', 'utf8'));
+      outerZip.writeZip(inputZipPath);
+
+      // Process outer ZIP
+      const stats = await processZipFile(inputZipPath, outputZipPath, false);
+
+      // Verify stats - inner.zip should be converted
+      expect(stats.convertedFiles).toBeGreaterThan(0);
+      expect(stats.totalFiles).toBe(2);
+
+      // Verify output ZIP contains processed inner.zip
+      const outputZip = new AdmZip(outputZipPath);
+      const entries = outputZip.getEntries();
+      const innerZipEntry = entries.find(e => e.entryName === 'inner.zip');
+
+      expect(innerZipEntry).toBeDefined();
+
+      // Extract and verify the processed inner ZIP
+      const processedInnerZip = new AdmZip(innerZipEntry.getData());
+      const innerEntries = processedInnerZip.getEntries();
+      const innerFileNames = innerEntries.map(e => e.entryName);
+
+      // The processed inner ZIP should contain both zh_cn and zh_tw
+      expect(innerFileNames).toContain('assets/mod/lang/zh_cn.json');
+      expect(innerFileNames).toContain('assets/mod/lang/zh_tw.json');
+    });
+
+    test('should handle multiple levels of nested ZIPs', async () => {
+      // Create innermost ZIP
+      const innermost = new AdmZip();
+      innermost.addFile('assets/mod/lang/zh_cn.json', Buffer.from('{"test": "测试"}', 'utf8'));
+
+      // Create middle ZIP containing innermost ZIP
+      const middle = new AdmZip();
+      middle.addFile('innermost.zip', innermost.toBuffer());
+
+      // Create outer ZIP containing middle ZIP
+      const outer = new AdmZip();
+      outer.addFile('middle.zip', middle.toBuffer());
+      outer.writeZip(inputZipPath);
+
+      // Process outer ZIP
+      const stats = await processZipFile(inputZipPath, outputZipPath, false);
+
+      // Verify it processed successfully
+      expect(stats.errors.length).toBe(0);
+
+      // Verify the nested structure was processed
+      const outputZip = new AdmZip(outputZipPath);
+      const middleEntry = outputZip.getEntry('middle.zip');
+      expect(middleEntry).toBeDefined();
+
+      // Check middle ZIP
+      const processedMiddle = new AdmZip(middleEntry.getData());
+      const innermostEntry = processedMiddle.getEntry('innermost.zip');
+      expect(innermostEntry).toBeDefined();
+
+      // Check innermost ZIP
+      const processedInnermost = new AdmZip(innermostEntry.getData());
+      const innermostFiles = processedInnermost.getEntries().map(e => e.entryName);
+      expect(innermostFiles).toContain('assets/mod/lang/zh_tw.json');
+    });
+
+    test('should respect max depth limit for nested ZIPs', async () => {
+      // Create a deeply nested ZIP (depth > 10)
+      let currentZip = new AdmZip();
+      currentZip.addFile('assets/mod/lang/zh_cn.json', Buffer.from('{"test": "测试"}', 'utf8'));
+
+      // Create 15 levels of nesting (exceeds MAX_DEPTH of 10)
+      for (let i = 0; i < 15; i++) {
+        const nextZip = new AdmZip();
+        nextZip.addFile(`level${i}.zip`, currentZip.toBuffer());
+        currentZip = nextZip;
+      }
+
+      currentZip.writeZip(inputZipPath);
+
+      // Process should complete without infinite recursion
+      const stats = await processZipFile(inputZipPath, outputZipPath, false);
+
+      // Should not crash and should complete
+      expect(stats).toBeDefined();
+    });
+
+    test('should NOT process nested ZIPs when convertNestedZip is false', async () => {
+      // Create inner ZIP with Chinese language file
+      const innerZip = new AdmZip();
+      innerZip.addFile('assets/mod/lang/zh_cn.json', Buffer.from('{"test": "测试"}', 'utf8'));
+      const innerZipBuffer = innerZip.toBuffer();
+
+      // Create outer ZIP containing the inner ZIP
+      const outerZip = new AdmZip();
+      outerZip.addFile('inner.zip', innerZipBuffer);
+      outerZip.writeZip(inputZipPath);
+
+      // Process outer ZIP with convertNestedZip = false
+      const stats = await processZipFile(inputZipPath, outputZipPath, false, null, 0, false);
+
+      // Verify output ZIP contains unmodified inner.zip
+      const outputZip = new AdmZip(outputZipPath);
+      const entries = outputZip.getEntries();
+      const innerZipEntry = entries.find(e => e.entryName === 'inner.zip');
+
+      expect(innerZipEntry).toBeDefined();
+
+      // The inner ZIP should be identical to the original (not processed)
+      const processedInnerZip = new AdmZip(innerZipEntry.getData());
+      const innerEntries = processedInnerZip.getEntries();
+      const innerFileNames = innerEntries.map(e => e.entryName);
+
+      // Should still have zh_cn but NO zh_tw (because it wasn't processed)
+      expect(innerFileNames).toContain('assets/mod/lang/zh_cn.json');
+      expect(innerFileNames).not.toContain('assets/mod/lang/zh_tw.json');
     });
   });
 

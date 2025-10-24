@@ -13,6 +13,7 @@ const progressMessage = document.getElementById("progressMessage");
 const resultSection = document.getElementById("resultSection");
 const resultContent = document.getElementById("resultContent");
 const convertEnUsCheckbox = document.getElementById("convertEnUsCheckbox");
+const convertNestedZipCheckbox = document.getElementById("convertNestedZipCheckbox");
 
 // Select input file
 selectInputBtn.addEventListener("click", async () => {
@@ -79,6 +80,7 @@ convertBtn.addEventListener("click", async () => {
   selectOutputBtn.disabled = true;
   convertBtn.disabled = true;
   convertEnUsCheckbox.disabled = true;
+  convertNestedZipCheckbox.disabled = true;
 
   // Show progress section
   progressSection.classList.remove("hidden");
@@ -87,10 +89,11 @@ convertBtn.addEventListener("click", async () => {
   progressBar.textContent = "";
 
   try {
-    // Get the convertEnUs option from checkbox
+    // Get options from checkboxes
     const convertEnUs = convertEnUsCheckbox.checked;
+    const convertNestedZip = convertNestedZipCheckbox.checked;
 
-    const result = await window.api.convert(inputFilePath, outputFilePath, isFolder, convertEnUs);
+    const result = await window.api.convert(inputFilePath, outputFilePath, isFolder, convertEnUs, convertNestedZip);
 
     if (result.success) {
       showResult(result.stats);
@@ -105,6 +108,7 @@ convertBtn.addEventListener("click", async () => {
     selectOutputBtn.disabled = false;
     convertBtn.disabled = false;
     convertEnUsCheckbox.disabled = false;
+    convertNestedZipCheckbox.disabled = false;
   }
 });
 

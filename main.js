@@ -89,7 +89,7 @@ ipcMain.handle("select-output-folder", async (event, defaultName) => {
 });
 
 // Handle conversion process for both ZIP files and folders
-ipcMain.handle("convert", async (event, inputPath, outputPath, isFolder, convertEnUs) => {
+ipcMain.handle("convert", async (event, inputPath, outputPath, isFolder, convertEnUs, convertNestedZip) => {
   try {
     let stats;
     if (isFolder) {
@@ -103,7 +103,7 @@ ipcMain.handle("convert", async (event, inputPath, outputPath, isFolder, convert
       stats = await processZipFile(inputPath, outputPath, convertEnUs, (progress) => {
         // Send progress updates to renderer
         mainWindow.webContents.send("conversion-progress", progress);
-      });
+      }, 0, convertNestedZip);
     }
 
     return { success: true, stats };
