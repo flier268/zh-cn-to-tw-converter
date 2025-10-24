@@ -65,20 +65,48 @@ function shouldConvertFile(filePath, convertEnUs = false) {
 }
 
 /**
+ * Preserve the case pattern of the original string
+ * @param {string} original - Original string
+ * @param {string} replacement - Replacement string in lowercase
+ * @returns {string} - Replacement with same case pattern as original
+ */
+function preserveCase(original, replacement) {
+  let result = '';
+  for (let i = 0; i < replacement.length && i < original.length; i++) {
+    const origChar = original[i];
+    const replChar = replacement[i];
+
+    if (origChar === origChar.toUpperCase() && origChar !== origChar.toLowerCase()) {
+      // Original character is uppercase letter
+      result += replChar.toUpperCase();
+    } else {
+      // Original character is lowercase or non-letter
+      result += replChar.toLowerCase();
+    }
+  }
+  // Append any remaining characters from replacement
+  result += replacement.substring(original.length);
+  return result;
+}
+
+/**
  * Convert file path from zh_cn/en_us to zh_tw or zh-cn/en-us to zh-tw
+ * Preserves the original case pattern (zh_cn→zh_tw, zh_CN→zh_TW, ZH-CN→ZH-TW, etc.)
  * @param {string} filePath - Original file path
  * @returns {string} - Converted file path
  */
 function convertFilePath(filePath) {
-  return filePath
-    .replace(/zh_cn/g, "zh_tw")
-    .replace(/zh-cn/g, "zh-tw")
-    .replace(/zh_CN/g, "zh_TW")
-    .replace(/zh-CN/g, "zh-TW")
-    .replace(/en_us/g, "zh_tw")
-    .replace(/en-us/g, "zh-tw")
-    .replace(/en_US/g, "zh_TW")
-    .replace(/en-US/g, "zh-TW");
+  // Replace zh_cn/zh-cn variants (preserving case and separator)
+  let result = filePath.replace(/zh([_-])cn/gi, (match, separator) => {
+    return preserveCase(match, `zh${separator}tw`);
+  });
+
+  // Replace en_us/en-us variants with zh_tw/zh-tw (preserving case and separator)
+  result = result.replace(/en([_-])us/gi, (match, separator) => {
+    return preserveCase(match, `zh${separator}tw`);
+  });
+
+  return result;
 }
 
 /**
@@ -107,6 +135,18 @@ async function processZipFile(inputPath, outputPath, convertEnUs = false, progre
     const zipEntries = inputZip.getEntries();
     stats.totalFiles = zipEntries.length;
 
+    // First pass: Check if there are any zh_cn/zh-cn files
+    let hasZhCnFiles = false;
+    for (const entry of zipEntries) {
+      if (entry.isDirectory) continue;
+      const lowerPath = entry.entryName.toLowerCase();
+      if ((lowerPath.endsWith(".json") || lowerPath.endsWith(".lang")) &&
+          (lowerPath.includes("zh_cn") || lowerPath.includes("zh-cn"))) {
+        hasZhCnFiles = true;
+        break;
+      }
+    }
+
     if (progressCallback) progressCallback({ stage: "processing", message: "正在處理檔案...", total: stats.totalFiles, current: 0 });
 
     // Create output zip
@@ -127,9 +167,14 @@ async function processZipFile(inputPath, outputPath, convertEnUs = false, progre
         // Note: We don't pass the attr parameter because adm-zip doesn't handle it correctly
         // It will automatically set proper file permissions (0o100644 = rw-r--r--)
 
+        // Determine if we should convert this file based on the new logic
+        const lowerPath = entry.entryName.toLowerCase();
+        const isEnUsFile = (lowerPath.endsWith(".json") || lowerPath.endsWith(".lang")) &&
+                           (lowerPath.includes("en_us") || lowerPath.includes("en-us"));
+
         // Check if this file should be converted
-        if (shouldConvertFile(entry.entryName, convertEnUs)) {
-          // Read and convert the file
+        if (shouldConvertFile(entry.entryName, false)) {
+          // This is a zh_cn file or snbt/openloader file - always convert
           const content = entry.getData().toString("utf8");
           const converted = convert(content);
           const newPath = convertFilePath(entry.entryName);
@@ -137,6 +182,18 @@ async function processZipFile(inputPath, outputPath, convertEnUs = false, progre
           // Add both original and converted versions (adm-zip will set proper permissions)
           outputZip.addFile(entry.entryName, entry.getData());
           outputZip.addFile(newPath, Buffer.from(converted, "utf8"));
+
+          stats.convertedFiles++;
+        } else if (convertEnUs && isEnUsFile && !hasZhCnFiles) {
+          // Only convert en-us files if:
+          // 1. convertEnUs is enabled
+          // 2. This is an en-us file
+          // 3. There are NO zh_cn files in the zip
+          const content = entry.getData().toString("utf8");
+          const converted = convert(content);
+
+          // Replace the en-us file with converted content (keep original path)
+          outputZip.addFile(entry.entryName, Buffer.from(converted, "utf8"));
 
           stats.convertedFiles++;
         } else {
@@ -218,6 +275,17 @@ async function processFolderPath(inputPath, outputPath, convertEnUs = false, pro
     await walkDir(inputPath);
     stats.totalFiles = allFiles.length;
 
+    // First pass: Check if there are any zh_cn/zh-cn files
+    let hasZhCnFiles = false;
+    for (const { relativePath } of allFiles) {
+      const lowerPath = relativePath.toLowerCase();
+      if ((lowerPath.endsWith(".json") || lowerPath.endsWith(".lang")) &&
+          (lowerPath.includes("zh_cn") || lowerPath.includes("zh-cn"))) {
+        hasZhCnFiles = true;
+        break;
+      }
+    }
+
     if (progressCallback) progressCallback({ stage: "processing", message: "正在處理檔案...", total: stats.totalFiles, current: 0 });
 
     // Process each file
@@ -230,9 +298,14 @@ async function processFolderPath(inputPath, outputPath, convertEnUs = false, pro
         const outputDir = path.dirname(outputFilePath);
         await fs.mkdir(outputDir, { recursive: true });
 
+        // Determine if we should convert this file based on the new logic
+        const lowerPath = relativePath.toLowerCase();
+        const isEnUsFile = (lowerPath.endsWith(".json") || lowerPath.endsWith(".lang")) &&
+                           (lowerPath.includes("en_us") || lowerPath.includes("en-us"));
+
         // Check if this file should be converted
-        if (shouldConvertFile(relativePath, convertEnUs)) {
-          // Read and convert the file
+        if (shouldConvertFile(relativePath, false)) {
+          // This is a zh_cn file or snbt/openloader file - always convert
           const content = await fs.readFile(fullPath, "utf8");
           const converted = convert(content);
           const newRelativePath = convertFilePath(relativePath);
@@ -245,6 +318,18 @@ async function processFolderPath(inputPath, outputPath, convertEnUs = false, pro
           // Write both original and converted versions
           await fs.copyFile(fullPath, outputFilePath);
           await fs.writeFile(newOutputPath, converted, "utf8");
+
+          stats.convertedFiles++;
+        } else if (convertEnUs && isEnUsFile && !hasZhCnFiles) {
+          // Only convert en-us files if:
+          // 1. convertEnUs is enabled
+          // 2. This is an en-us file
+          // 3. There are NO zh_cn files in the folder
+          const content = await fs.readFile(fullPath, "utf8");
+          const converted = convert(content);
+
+          // Replace the en-us file with converted content (keep original path)
+          await fs.writeFile(outputFilePath, converted, "utf8");
 
           stats.convertedFiles++;
         } else {
