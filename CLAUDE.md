@@ -16,10 +16,27 @@ npm install
 
 # Run in development mode
 npm start
-
-# Run test conversion (requires resources.zip in root)
-node test.js
 ```
+
+### Testing
+
+```bash
+# Run unit tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+The test suite (`converter.test.js`) covers:
+- Text conversion (simplified → traditional Chinese)
+- File path detection and conversion logic
+- ZIP file processing
+- Folder processing
+- en_us conversion behavior
 
 ### Building
 
@@ -39,17 +56,6 @@ npm run build:all
 
 Built files are output to the `dist/` directory.
 
-### Testing Conversion Logic
-
-To test the conversion without the GUI:
-
-```bash
-# Requires a resources.zip file in the project root
-node test.js
-```
-
-This will convert `resources.zip` → `resources-zh_tw.zip` with console progress output.
-
 ## Architecture
 
 ### Electron Multi-Process Architecture
@@ -66,12 +72,13 @@ The application follows the standard Electron pattern with three main processes:
 2. **Preload Script** (`preload.js`)
    - Bridges main and renderer processes
    - Exposes safe IPC channels via `contextBridge`
-   - Provides: `selectInputFile()`, `selectOutputFile()`, `convertZip()`, `onProgress()`
+   - Provides: `selectInputFile()`, `selectOutputFile()`, `selectOutputFolder()`, `convert()`, `onConversionProgress()`
 
 3. **Renderer Process** (`renderer.js`)
    - Handles UI interactions
    - Updates progress bars and result displays
    - Manages button states during conversion
+   - Handles both ZIP file and folder input selection
 
 ### Core Conversion Logic (`converter.js`)
 
@@ -86,9 +93,12 @@ The conversion pipeline consists of:
    - **SNBT files** (`.snbt`): Always converted (no language flag required)
    - **OpenLoader files**: All `.json`/`.lang` files in `openloader/` directories
    - **Language files**: `.json`/`.lang` files with `zh_cn` or `zh-cn` in path
+   - **Optional en_us conversion**: When enabled and NO zh_cn files exist, converts `en_us`/`en-us` files
 
 3. **Path Conversion** (`convertFilePath()` function)
    - Replaces all variations: `zh_cn` → `zh_tw`, `zh-cn` → `zh-tw`, `zh_CN` → `zh_TW`, `zh-CN` → `zh-TW`
+   - Also converts: `en_us` → `zh_tw`, `en-us` → `zh-tw` (when applicable)
+   - Preserves original case pattern using `preserveCase()` helper
 
 4. **ZIP Processing** (`processZipFile()` function)
    - Extracts ZIP entries using `adm-zip`
@@ -97,12 +107,31 @@ The conversion pipeline consists of:
    - SNBT files are converted in-place (no separate zh_tw version)
    - Reports progress via callback with stages: reading, processing, writing, complete, error
 
+5. **Folder Processing** (`processFolderPath()` function)
+   - Recursively walks directory tree to find all files
+   - Applies same conversion logic as ZIP processing
+   - Creates parallel directory structure in output folder
+   - Preserves file permissions and directory hierarchy
+
 ### File Processing Strategy
 
 - **Language files** (`.json`, `.lang`): Creates parallel zh_tw/zh-tw files alongside zh_cn/zh-cn originals
 - **SNBT files**: Converts in-place without creating separate zh_tw versions
 - **OpenLoader files**: All `.json`/`.lang` files in `openloader/` directories are converted regardless of naming
-- **Other files**: Copied as-is to output ZIP
+- **en_us files**: Only converted when the `convertEnUs` checkbox is enabled AND no zh_cn files exist in the resource pack
+- **Other files**: Copied as-is to output ZIP/folder
+
+### Input Support
+
+The application supports two types of input:
+
+1. **ZIP Files** - Minecraft resource pack ZIP files
+   - Output: New ZIP file with suffix `-zh_tw.zip`
+   - Contains both original and converted files
+
+2. **Folders** - Extracted resource pack directories
+   - Output: New folder with suffix `-zh_tw`
+   - Useful for development and testing without repackaging
 
 ## Key Dependencies
 
@@ -111,6 +140,8 @@ The conversion pipeline consists of:
 - **novel-segment**: Chinese word segmentation for better conversion quality
 - **adm-zip**: ZIP file manipulation (extraction and creation)
 - **electron-builder**: Packaging for Windows (.exe) and Linux (AppImage)
+- **jest**: Unit testing framework
+- **canvas**: Required by electron-builder for icon generation
 
 ## CI/CD
 
@@ -138,12 +169,20 @@ The app follows Electron security best practices:
 - `contextIsolation: true` - Isolates preload script context
 - Preload script uses `contextBridge` to expose limited IPC APIs
 
-### Testing Conversion
+### Linux AppImage Sandbox Fix
+
+The AppImage build includes an automatic sandbox fix (`appimage-fix.js`) that runs during the build process:
+- Renames the Electron executable to `.bin`
+- Creates a shell wrapper that launches with `--no-sandbox` flag
+- Enables user namespace sandboxing (secure, no root required)
+- Solves the common SUID sandbox error in AppImages mounted on `nosuid` filesystems
+
+### Testing Conversion Logic
 
 When testing conversion logic changes:
-1. Place a test `resources.zip` in the project root
-2. Run `node test.js` to test conversion without GUI
-3. Check `resources-zh_tw.zip` output and console statistics
+1. Write unit tests in `converter.test.js` for new features
+2. Run `npm test` to verify all tests pass
+3. For manual testing, use the GUI with sample ZIP files or folders
 
 ### OpenLoader Support
 
@@ -159,3 +198,12 @@ SNBT (Structured NBT) files are commonly used by FTB Quests and other mods. Thes
 - Always get converted (no language flag check required)
 - Are converted in-place rather than creating separate zh_tw versions
 - Use the same text conversion pipeline as JSON/LANG files
+
+### en_us Conversion Feature
+
+The application includes an optional feature to convert English files to Traditional Chinese:
+- Enabled via the "同時轉換英文翻譯為繁體中文" checkbox in the UI
+- Only activates when NO zh_cn files exist in the resource pack
+- Replaces en_us/en-us content with converted Traditional Chinese text
+- Useful for mods that only provide English translations (converts English → Simplified Chinese detection → Traditional Chinese)
+- **Note**: The conversion quality depends on whether the English text contains Chinese characters that can be converted
