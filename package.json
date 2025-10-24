@@ -5,6 +5,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron . --no-sandbox",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux AppImage",
@@ -28,7 +31,8 @@
   "devDependencies": {
     "canvas": "^3.2.0",
     "electron": "^38.3.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "jest": "^30.2.0"
   },
   "build": {
     "appId": "com.minecraft.zh-cn-to-tw-converter",
@@ -79,5 +83,18 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     }
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/",
+      "test.js",
+      "generate-icon.js",
+      "appimage-fix.js"
+    ],
+    "testMatch": [
+      "**/*.test.js"
+    ]
   }
 }
