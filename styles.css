@@ -67,6 +67,32 @@ h2 {
   align-items: center;
 }
 
+.options-group {
+  padding: 15px;
+  background: #f7fafc;
+  border-radius: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #667eea;
+}
+
+.checkbox-label span {
+  font-size: 15px;
+  color: #333;
+}
+
 .btn {
   padding: 12px 24px;
   border: none;

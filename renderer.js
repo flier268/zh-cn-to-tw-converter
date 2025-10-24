@@ -1,5 +1,6 @@
 let inputFilePath = null;
 let outputFilePath = null;
+let isFolder = false;
 
 const selectInputBtn = document.getElementById("selectInputBtn");
 const selectOutputBtn = document.getElementById("selectOutputBtn");
@@ -11,21 +12,33 @@ const progressBar = document.getElementById("progressBar");
 const progressMessage = document.getElementById("progressMessage");
 const resultSection = document.getElementById("resultSection");
 const resultContent = document.getElementById("resultContent");
+const convertEnUsCheckbox = document.getElementById("convertEnUsCheckbox");
 
 // Select input file
 selectInputBtn.addEventListener("click", async () => {
-  const filePath = await window.api.selectInputFile();
-  if (filePath) {
-    inputFilePath = filePath;
-    inputFilePathDisplay.textContent = filePath;
+  const result = await window.api.selectInputFile();
+  if (result) {
+    inputFilePath = result.path;
+    isFolder = result.isFolder;
+    inputFilePathDisplay.textContent = result.path;
     selectOutputBtn.disabled = false;
 
-    // Auto-generate output filename
-    const fileName = filePath.split(/[\\/]/).pop().replace(".zip", "");
-    const suggestedName = `${fileName}-zh_tw.zip`;
-    const outputPath = filePath.replace(/[^/\\]+$/, suggestedName);
-    outputFilePath = outputPath;
-    outputFilePathDisplay.textContent = outputPath;
+    // Auto-generate output filename/path
+    if (isFolder) {
+      // For folders, suggest a new folder name
+      const folderName = result.path.split(/[\\/]/).pop();
+      const suggestedName = `${folderName}-zh_tw`;
+      const outputPath = result.path.replace(/[^/\\]+$/, suggestedName);
+      outputFilePath = outputPath;
+      outputFilePathDisplay.textContent = outputPath;
+    } else {
+      // For ZIP files, suggest a new ZIP name
+      const fileName = result.path.split(/[\\/]/).pop().replace(".zip", "");
+      const suggestedName = `${fileName}-zh_tw.zip`;
+      const outputPath = result.path.replace(/[^/\\]+$/, suggestedName);
+      outputFilePath = outputPath;
+      outputFilePathDisplay.textContent = outputPath;
+    }
     convertBtn.disabled = false;
   }
 });
@@ -34,14 +47,26 @@ selectInputBtn.addEventListener("click", async () => {
 selectOutputBtn.addEventListener("click", async () => {
   if (!inputFilePath) return;
 
-  const fileName = inputFilePath.split(/[\\/]/).pop().replace(".zip", "");
-  const suggestedName = `${fileName}-zh_tw.zip`;
-
-  const filePath = await window.api.selectOutputFile(suggestedName);
-  if (filePath) {
-    outputFilePath = filePath;
-    outputFilePathDisplay.textContent = filePath;
-    convertBtn.disabled = false;
+  if (isFolder) {
+    // For folders, let user select an output folder
+    const folderName = inputFilePath.split(/[\\/]/).pop();
+    const suggestedName = `${folderName}-zh_tw`;
+    const folderPath = await window.api.selectOutputFolder(suggestedName);
+    if (folderPath) {
+      outputFilePath = folderPath;
+      outputFilePathDisplay.textContent = folderPath;
+      convertBtn.disabled = false;
+    }
+  } else {
+    // For ZIP files, let user select an output ZIP file
+    const fileName = inputFilePath.split(/[\\/]/).pop().replace(".zip", "");
+    const suggestedName = `${fileName}-zh_tw.zip`;
+    const filePath = await window.api.selectOutputFile(suggestedName);
+    if (filePath) {
+      outputFilePath = filePath;
+      outputFilePathDisplay.textContent = filePath;
+      convertBtn.disabled = false;
+    }
   }
 });
 
@@ -53,6 +78,7 @@ convertBtn.addEventListener("click", async () => {
   selectInputBtn.disabled = true;
   selectOutputBtn.disabled = true;
   convertBtn.disabled = true;
+  convertEnUsCheckbox.disabled = true;
 
   // Show progress section
   progressSection.classList.remove("hidden");
@@ -61,7 +87,10 @@ convertBtn.addEventListener("click", async () => {
   progressBar.textContent = "";
 
   try {
-    const result = await window.api.convertZip(inputFilePath, outputFilePath);
+    // Get the convertEnUs option from checkbox
+    const convertEnUs = convertEnUsCheckbox.checked;
+
+    const result = await window.api.convert(inputFilePath, outputFilePath, isFolder, convertEnUs);
 
     if (result.success) {
       showResult(result.stats);
@@ -75,6 +104,7 @@ convertBtn.addEventListener("click", async () => {
     selectInputBtn.disabled = false;
     selectOutputBtn.disabled = false;
     convertBtn.disabled = false;
+    convertEnUsCheckbox.disabled = false;
   }
 });
 

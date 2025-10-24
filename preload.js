@@ -5,7 +5,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("api", {
   selectInputFile: () => ipcRenderer.invoke("select-input-file"),
   selectOutputFile: (defaultName) => ipcRenderer.invoke("select-output-file", defaultName),
-  convertZip: (inputPath, outputPath) => ipcRenderer.invoke("convert-zip", inputPath, outputPath),
+  selectOutputFolder: (defaultName) => ipcRenderer.invoke("select-output-folder", defaultName),
+  convert: (inputPath, outputPath, isFolder, convertEnUs) =>
+    ipcRenderer.invoke("convert", inputPath, outputPath, isFolder, convertEnUs),
   onConversionProgress: (callback) => {
     ipcRenderer.on("conversion-progress", (event, progress) => callback(progress));
   },
